@@ -4,12 +4,13 @@
 #include <vector>
 #include <string>
 #include <iostream>
+#include "solve.hpp" //https://github.com/shirnschall/cpp-solve
 
 typedef struct _CommandVar
 {
     int index;
     std::string key;
-    int value;
+    float value;
 }CommandVar, *PCommandVar;
 
 
@@ -40,7 +41,11 @@ public:
         return { -1, "", 0 };
     }
 
-    static bool SetVar(std::string key, int value){
+    static bool SetVar(std::string key, float value){
+        if(key.size() != 1){
+            std::cout << "SetVar: Key Uzunluğu Sadece 1 Karakter Olabilir\n";
+            return false;
+        }
         for(CommandVar var : CommandVars){
             if (var.key == key){
                 CommandVars.at(var.index).value = value;
@@ -55,7 +60,7 @@ public:
         return true;
     }
 
-    static bool SetVar(int index, int value){
+    static bool SetVar(int index, float value){
         if (index > (CommandVars.size() - 1)){
             std::cout << "SetVar: İndex Hatalı\n";
             return false;
@@ -86,20 +91,41 @@ public:
         return true;
     }
 
+    static std::string PutVars(std::string Text){
+        std::string Alp = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+        std::string ret = "";
+        for (int i = 0; i < Text.size(); i++){
+            char token_char = Text.at(i); 
+            std::string token = std::string(1, token_char);
+            for (int j = 0; j < Alp.size(); j++){
+                if(token_char == Alp.at(j)){
+                    CommandVar Var = GetVar(token);
+                    if(Var.index == -1){
+                        std::cout << "PutVars: Değişken Bulunamadı\n";
+                        return "";
+                    }
+                    token = std::to_string(Var.value);
+                    break;
+                }
+            }
+            ret += token;
+        }
+        return ret;
+    }
+
     static bool ParseCommand(std::string line){
-        CommandVar FirstVar;
-        CommandVar SecondVar;
+        CommandVar Var;
         std::vector<std::string> tokens = SplitCommand(line, " ");
 
         if (tokens.size() == 2){
             if (tokens.at(0) == "out"){
-                FirstVar = GetVar(tokens.at(1));
-                if(FirstVar.index == -1){
+                Var = GetVar(tokens.at(1));
+                if(Var.index == -1){
                     std::cout << "ParseCommand: Çıkış Değişkeni Bulunamadı\n";
                     return false;
                 }
                 FILE* f = fopen("out.txt", "w");
-                fprintf(f, "%d\n", FirstVar.value);
+                fprintf(f, "%f\n", Var.value);
                 fclose(f);
                 return true;
             }
@@ -112,83 +138,26 @@ public:
         }
         
         if(isNumeric(tokens.at(0))){
-            std::cout << "ParseCommand: İlk Değişken Sayı Olamaz\n";
+            std::cout << "ParseCommand: Değişken Harf Olmalı\n";
             return false;
         }
-        int value;
-        bool Numeric = false;
-        if(isNumeric(tokens.at(2))){
-            Numeric = true;
-            value = stoi(tokens.at(2));
-        }
         
-        FirstVar = GetVar(tokens.at(0));
-        if(!Numeric){
-            SecondVar = GetVar(tokens.at(2));
-            if(SecondVar.index == -1){
-                std::cout << "ParseCommand: İkinci Değişken Bulunamadı\n";
-                return false;
-            }
+        if(tokens.at(0).size() != 1){
+            std::cout << "ParseCommand: Değişken Uzunluğu Sadece 1 Karakter Olabilir\n";
+            return false;
         }
 
-
+        Var = GetVar(tokens.at(0));
+        std::string Transaction_Text = tokens.at(2);
+        if(Transaction_Text.size() < 1){
+            std::cout << "ParseCommand: İşlem Uzunluğu Çok Az\n";
+            return false;
+        }
+        Transaction_Text = PutVars(Transaction_Text);
         if (tokens.at(1) == "="){
-            if(Numeric){
-                if(SetVar(tokens.at(0), value))
-                    return true;
-            }
-            else{
-                if(SetVar(tokens.at(0), SecondVar.value))
-                    return true;
-            }
+            if(SetVar(tokens.at(0), solve(Transaction_Text.c_str(), 0, Transaction_Text.size(), nullptr)))
+                return true;
             return false;
-        }
-        
-        if(FirstVar.index == -1){
-            std::cout << "ParseCommand: İlk Değişken Bulunamadı\n";
-            return false;
-        }
-
-
-        if (tokens.at(1) == "+"){
-            if(Numeric){
-                if(SetVar(FirstVar.index, FirstVar.value + value))
-                    return true;
-            }
-            else{
-                if(SetVar(FirstVar.index, FirstVar.value + SecondVar.value))
-                    return true;
-            }
-        }
-        else if (tokens.at(1) == "-"){
-            if(Numeric){
-                if(SetVar(FirstVar.index, FirstVar.value - value))
-                    return true;
-            }
-            else{
-                if(SetVar(FirstVar.index, FirstVar.value - SecondVar.value))
-                    return true;
-            }
-        }
-        else if (tokens.at(1) == "*"){
-            if(Numeric){
-                if(SetVar(FirstVar.index, FirstVar.value * value))
-                    return true;
-            }
-            else{
-                if(SetVar(FirstVar.index, FirstVar.value * SecondVar.value))
-                    return true;
-            }
-        }
-        else if (tokens.at(1) == "/"){
-            if(Numeric){
-                if(SetVar(FirstVar.index, FirstVar.value / value))
-                    return true;
-            }
-            else{
-                if(SetVar(FirstVar.index, FirstVar.value / SecondVar.value))
-                    return true;
-            }
         }
         else{
             std::cout << "ParseCommand: İşlem Geçersiz\n";
